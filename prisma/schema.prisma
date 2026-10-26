@@ -1,0 +1,53 @@
+// Prisma schema — SQLite en local, migration Postgres possible en changeant
+// `provider` ci-dessous et la variable DATABASE_URL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Une commande = une transaction NabooPay (un soutien "For you").
+model Order {
+  id            String    @id @default(cuid())
+  orderId       String    @unique // order_id renvoyé par NabooPay
+  status        String    @default("pending") // pending | completed | cancelled | failed | ...
+  amount        Int // montant en XOF (entier, pas de centimes)
+  currency      String    @default("XOF")
+  method        String // WAVE | ORANGE_MONEY (moyen choisi par le client)
+  checkoutUrl   String?
+  customerName  String?
+  customerPhone String?
+  fees          Int?
+  paidAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  events WebhookEvent[]
+}
+
+// Journal des webhooks reçus. La contrainte unique (orderId, status) rend
+// le traitement idempotent : un événement rejoué déclenche une P2002 qu'on ignore.
+model WebhookEvent {
+  id        String   @id @default(cuid())
+  orderId   String
+  status    String
+  payload   String // body brut reçu, pour audit
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [orderId])
+
+  @@unique([orderId, status])
+}
+
+// Compte d'accès au tableau de bord /admin. Créé via `npm run admin:create`.
+model AdminUser {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  passwordHash String // scrypt$<sel hex>$<hash hex>
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+}
