@@ -1,12 +1,11 @@
-// Prisma schema — SQLite en local, migration Postgres possible en changeant
-// `provider` ci-dessous et la variable DATABASE_URL.
+// Prisma schema — PostgreSQL (Neon en production comme en local).
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

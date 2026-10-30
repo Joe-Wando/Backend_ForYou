@@ -1,7 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ListOrdersDto } from './dto/list-orders.dto';
+import { hashPassword } from './password';
+
+export interface AdminAccount {
+  id: string;
+  username: string;
+  lastLoginAt: string | null;
+  createdAt: string;
+}
 
 export interface AdminOrder {
   order_id: string;
@@ -85,4 +93,37 @@ export class AdminService {
       },
     };
   }
+
+  async listUsers(): Promise<AdminAccount[]> {
+    const users = await this.prisma.adminUser.findMany({ orderBy: { createdAt: 'asc' } });
+    return users.map(toAccount);
+  }
+
+  async createUser(username: string, password: string): Promise<AdminAccount> {
+    try {
+      const user = await this.prisma.adminUser.create({
+        data: { username, passwordHash: await hashPassword(password) },
+      });
+      return toAccount(user);
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictException(`L'identifiant "${username}" est déjà utilisé.`);
+      }
+      throw err;
+    }
+  }
+}
+
+function toAccount(user: {
+  id: string;
+  username: string;
+  lastLoginAt: Date | null;
+  createdAt: Date;
+}): AdminAccount {
+  return {
+    id: user.id,
+    username: user.username,
+    lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : null,
+    createdAt: user.createdAt.toISOString(),
+  };
 }
