@@ -68,18 +68,19 @@ export class PaymentsService {
     const frontendUrl = this.config.get<string>('frontendUrl')!.replace(/\/$/, '');
 
     const transaction = await this.naboopay.createTransaction({
-      method_of_payment: [method],
+      // API v2 : identifiants en minuscules (WAVE → wave, ORANGE_MONEY → orange_money).
+      method_of_payment: [method.toLowerCase()],
       products: [
         {
           name: 'Contribution For you',
-          category: 'Soutien',
-          amount,
+          price: amount,
           quantity: 1,
           description: 'Contribution libre via For you',
         },
       ],
       success_url: `${frontendUrl}/success`,
       error_url: `${frontendUrl}/error`,
+      fees_customer_side: false,
       is_escrow: false,
     });
 
@@ -179,9 +180,15 @@ export class PaymentsService {
     this.logger.log(`Commande ${orderId} → ${status}`);
   }
 
+  /**
+   * Statut NabooPay → statut interne. La v2 renvoie "paid" / "paid_and_blocked"
+   * (escrow) pour un paiement réussi ; on les enregistre en "completed", la
+   * valeur attendue par le dashboard et les totaux.
+   */
   private normalizeStatus(status: string | undefined | null): string | null {
     if (!status) return null;
-    return String(status).toLowerCase().trim();
+    const value = String(status).toLowerCase().trim();
+    return value === 'paid' || value === 'paid_and_blocked' ? 'completed' : value;
   }
 
   private toStatusDto(order: {

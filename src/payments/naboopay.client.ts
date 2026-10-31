@@ -4,17 +4,20 @@ import axios, { AxiosError, AxiosInstance } from 'axios';
 
 export interface NaboopayProductLine {
   name: string;
-  category: string;
-  amount: number;
+  /** Prix unitaire en XOF. */
+  price: number;
   quantity: number;
   description: string;
 }
 
 export interface CreateTransactionInput {
+  /** Identifiants v2 en minuscules : "wave" | "orange_money". */
   method_of_payment: string[];
   products: NaboopayProductLine[];
   success_url: string;
   error_url: string;
+  /** false = les frais sont déduits de ce que reçoit le marchand. */
+  fees_customer_side: boolean;
   is_escrow: boolean;
 }
 
@@ -93,8 +96,12 @@ export class NaboopayClient {
         );
       }
 
+      // v2 renvoie { error: "..." } ; message / detail restent pour l'ancien format.
       const providerMessage =
-        (axErr.response?.data && (axErr.response.data.message || axErr.response.data.detail)) ||
+        (axErr.response?.data &&
+          (axErr.response.data.error ||
+            axErr.response.data.message ||
+            axErr.response.data.detail)) ||
         undefined;
 
       if (status >= 400 && status < 500) {
